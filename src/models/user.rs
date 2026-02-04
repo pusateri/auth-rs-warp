@@ -31,7 +31,9 @@ impl<'a> NewUser<'a> {
             (&self.email, &self.hash_pass),
         );
         let Ok(updated) = result else {
-            return Err(result.err().unwrap().into());
+            return Err(ServiceError::AlreadyExists(anyhow::anyhow!(
+                "AlreadyExists"
+            )));
         };
         if updated == 0 {
             return Err(ServiceError::AlreadyExists(anyhow::anyhow!(

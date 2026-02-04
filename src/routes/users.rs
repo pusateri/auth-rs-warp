@@ -16,15 +16,11 @@ pub struct RegisterUserIn {
 
 pub async fn user_register(ruIn: RegisterUserIn) -> Result<impl Reply, Rejection> {
     let db = db_conn::get().map_err(ServiceError::from)?;
-
     let newUser = NewUser::from_credentials(&ruIn.email, &ruIn.password)?;
-    info!("got new user");
     let user = newUser.insert(&db)?;
-    info!("inserted user into database");
 
     // set signed cookie with userID
     let token = AuthnToken::from_userId(user.id)?;
-    info!("got token");
     Ok(Response::builder()
         .header("Set-Cookie", token.header_val())
         .body(json!(UserResp::from(user)).to_string()))
@@ -51,7 +47,7 @@ pub async fn user_login(authIn: UserAuthIn) -> Result<impl Reply, Rejection> {
                 hash_pass: row.get(3)?,
             })
         })
-        .or(Err(ServiceError::Unauthorized))?;
+        .or(Err(ServiceError::NotFound("NotFound")))?;
 
     if let Some(result) = user_iter.next() {
         if let Ok(user) = result {

@@ -15,7 +15,6 @@ mod models;
 mod routes;
 use routes::middleware::authn;
 use routes::protected;
-mod schema;
 mod utils;
 use utils::db_conn;
 
