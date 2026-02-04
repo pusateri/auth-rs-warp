@@ -1,6 +1,5 @@
 use crate::errors::ServiceError;
 use crate::utils::crypto::pwhash;
-use chrono::Local;
 use chrono::NaiveDateTime;
 use r2d2_sqlite::SqliteConnectionManager;
 
@@ -27,39 +26,47 @@ impl<'a> NewUser<'a> {
         self,
         db_conn: &r2d2::PooledConnection<SqliteConnectionManager>,
     ) -> Result<User, ServiceError> {
-        match db_conn.execute(
-            "INSERT INTO user (created_at, email, hash_pass) VALUES (?1, ?2, ?3)",
-            (Local::now().naive_local(), &self.email, &self.hash_pass),
-        ) {
-            Ok(updated) => println!("{} rows were updated", updated),
-            Err(err) => return Err(err.into()),
+        let result = db_conn.execute(
+            "INSERT INTO users (email, hash_pass) VALUES (?1, ?2)",
+            (&self.email, &self.hash_pass),
+        );
+        let Ok(updated) = result else {
+            return Err(result.err().unwrap().into());
+        };
+        if updated == 0 {
+            return Err(ServiceError::AlreadyExists(anyhow::anyhow!(
+                "AlreadyExists"
+            )));
         }
-        let mut stmt = db_conn
-            .prepare("SELECT id, created_at, email, hash_pass FROM user")
-            .or(Err(ServiceError::Unauthorized))?;
-        let user_iter = stmt
-            .query_map([], |row| {
-                Ok(User {
-                    id: row.get(0)?,
-                    created_at: row.get(1)?,
-                    email: row.get(2)?,
-                    hash_pass: row.get(3)?,
-                })
+        if updated > 1 {
+            return Err(ServiceError::AlreadyExists(anyhow::anyhow!(
+                "Multiple records with same email exist"
+            )));
+        }
+        let result = db_conn
+            .prepare("SELECT id, created_at, email, hash_pass FROM users where email = :email");
+        let Ok(mut stmt) = result else {
+            return Err(result.err().unwrap().into());
+        };
+        let result = stmt.query_map(&[(":email", &self.email)], |row| {
+            Ok(User {
+                id: row.get(0)?,
+                created_at: row.get(1)?,
+                email: row.get(2)?,
+                hash_pass: row.get(3)?,
             })
-            .or(Err(ServiceError::Unauthorized))?;
-
-        if let Some(u) = user_iter
-            .collect::<Vec<Result<User, rusqlite::Error>>>()
-            .first()
-        {
+        });
+        let Ok(mut user_iter) = result else {
+            return Err(result.err().unwrap().into());
+        };
+        if let Some(u) = user_iter.next() {
             if let Ok(user) = u {
                 return Ok(user.clone());
             } else {
                 return Err(ServiceError::Unauthorized);
             }
-        } else {
-            return Err(ServiceError::Unauthorized);
         }
+        return Err(ServiceError::Unauthorized);
     }
 }
 
