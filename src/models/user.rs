@@ -1,12 +1,10 @@
-use chrono::NaiveDateTime;
-use diesel::prelude::*;
-use diesel::PgConnection;
-//
 use crate::errors::ServiceError;
-use crate::schema::users::{self, dsl::users as usersTable};
 use crate::utils::crypto::pwhash;
+use chrono::Local;
+use chrono::NaiveDateTime;
+use r2d2_sqlite::SqliteConnectionManager;
 
-#[derive(Debug, Clone, Serialize, Deserialize, Queryable)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct User {
     pub id: i64,
     pub created_at: NaiveDateTime, // Local::now().naive_local()
@@ -15,8 +13,7 @@ pub struct User {
     pub hash_pass: String,
 }
 
-#[derive(Insertable)]
-#[table_name = "users"]
+#[derive(Debug)]
 pub struct NewUser<'a> {
     pub email: &'a str,
     pub hash_pass: String,
@@ -26,11 +23,43 @@ impl<'a> NewUser<'a> {
         let hash_pass = pwhash::hash_password(password)?;
         Ok(Self { email, hash_pass })
     }
-    pub fn insert(self, db_conn: &PgConnection) -> Result<User, ServiceError> {
-        let user: User = diesel::insert_into(usersTable)
-            .values(&self)
-            .get_result(db_conn)?;
-        Ok(user.into())
+    pub fn insert(
+        self,
+        db_conn: &r2d2::PooledConnection<SqliteConnectionManager>,
+    ) -> Result<User, ServiceError> {
+        match db_conn.execute(
+            "INSERT INTO user (created_at, email, hash_pass) VALUES (?1, ?2, ?3)",
+            (Local::now().naive_local(), &self.email, &self.hash_pass),
+        ) {
+            Ok(updated) => println!("{} rows were updated", updated),
+            Err(err) => return Err(err.into()),
+        }
+        let mut stmt = db_conn
+            .prepare("SELECT id, created_at, email, hash_pass FROM user")
+            .or(Err(ServiceError::Unauthorized))?;
+        let user_iter = stmt
+            .query_map([], |row| {
+                Ok(User {
+                    id: row.get(0)?,
+                    created_at: row.get(1)?,
+                    email: row.get(2)?,
+                    hash_pass: row.get(3)?,
+                })
+            })
+            .or(Err(ServiceError::Unauthorized))?;
+
+        if let Some(u) = user_iter
+            .collect::<Vec<Result<User, rusqlite::Error>>>()
+            .first()
+        {
+            if let Ok(user) = u {
+                return Ok(user.clone());
+            } else {
+                return Err(ServiceError::Unauthorized);
+            }
+        } else {
+            return Err(ServiceError::Unauthorized);
+        }
     }
 }
 

@@ -1,4 +1,3 @@
-use anyhow::Error as AnyErr;
 use serde::ser::{Serialize, SerializeStruct, Serializer};
 use std::convert::Infallible;
 use warp::http::StatusCode;
@@ -17,11 +16,6 @@ pub enum ServiceError {
     Other(#[from] anyhow::Error), // source and Display delegate to anyhow::Error
 }
 impl warp::reject::Reject for ServiceError {}
-impl From<ServiceError> for warp::reject::Rejection {
-    fn from(e: ServiceError) -> Self {
-        warp::reject::custom(e)
-    }
-}
 
 impl From<r2d2::Error> for ServiceError {
     fn from(e: r2d2::Error) -> Self {
@@ -43,18 +37,9 @@ impl From<base64::DecodeError> for ServiceError {
         ServiceError::Other(e.into())
     }
 }
-impl From<diesel::result::Error> for ServiceError {
-    fn from(e: diesel::result::Error) -> Self {
-        use diesel::result::{DatabaseErrorKind, Error as DieselErr};
-        match &e {
-            DieselErr::DatabaseError(kind, info) => match kind {
-                DatabaseErrorKind::UniqueViolation => {
-                    ServiceError::AlreadyExists(AnyErr::msg(info.message().to_owned()))
-                }
-                _ => ServiceError::Other(e.into()),
-            },
-            _ => ServiceError::Other(e.into()),
-        }
+impl From<rusqlite::Error> for ServiceError {
+    fn from(e: rusqlite::Error) -> Self {
+        ServiceError::Other(e.into())
     }
 }
 

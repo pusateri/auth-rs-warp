@@ -1,11 +1,16 @@
 use anyhow::{Context, Error as AnyErr};
 use argonautica::{Hasher as ArgonHasher, Verifier};
-use bytes::Bytes;
+use base64::{engine::general_purpose, Engine as _};
+use bytes::BytesMut;
 use chrono::{Duration, Local};
 use crypto::blake2b::Blake2b; // WARNING: use Blake2b-512 or Keccak-512
 use crypto::digest::Digest;
-use ed25519_dalek::{self as ed, Keypair, PublicKey, Signature, SignatureError};
-use rand::rngs::OsRng;
+use ed25519_dalek::{
+    self as ed, Signature, SignatureError, Signer, SigningKey, VerifyingKey, SECRET_KEY_LENGTH,
+};
+use rand::rand_core::UnwrapErr;
+use rand::rngs::SysRng;
+use std::convert::TryInto;
 use std::fs;
 //
 use crate::errors::ServiceError;
@@ -36,7 +41,7 @@ pub mod authn {
     use super::*;
     const KEYS_FOLDER: &'static str = "./.cache/keys"; // WARNING pass via configMap, use fs::Path
     lazy_static::lazy_static! {
-        pub static ref KEYPAIR_AUTHN:KeyPair = KeyPair::from_file_or_new("keypair_tkn_sign").expect("failed generating keypair for token signing");
+        pub static ref KEYPAIR_AUTHN:MyKeyPair = MyKeyPair::from_file_or_new("keypair_tkn_sign").expect("failed generating keypair for token signing");
     }
 
     #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -85,7 +90,7 @@ pub mod authn {
                 .map_err(|_| ServiceError::Unauthorized)
         }
         pub fn to_bytes(&self) -> Vec<u8> {
-            let mut b = Bytes::new();
+            let mut b = BytesMut::new();
             b.extend_from_slice(&self.claims.iat.to_be_bytes());
             b.extend_from_slice(&self.claims.exp.to_be_bytes());
             b.extend_from_slice(&self.claims.userID.to_be_bytes());
@@ -102,17 +107,17 @@ pub mod authn {
             buf.copy_from_slice(&bytes[16..24]);
             let userID: i64 = i64::from_be_bytes(buf);
 
-            let sig: Signature = Signature::from_bytes(&bytes[24..])?;
+            let sig: Signature = Signature::from_slice(&bytes[24..])?;
             Ok(AuthnToken {
                 claims: Claims { iat, exp, userID },
                 sig,
             })
         }
         pub fn to_str(&self) -> String {
-            base64::encode(&self.to_bytes())
+            general_purpose::STANDARD.encode(&self.to_bytes())
         }
         pub fn from_str(token: &str) -> Result<Self, ServiceError> {
-            let bytes = base64::decode(&token)?;
+            let bytes = general_purpose::STANDARD.decode(&token)?;
             Ok(Self::from_bytes(&bytes)?)
         }
         pub fn header_val(&self) -> String {
@@ -123,13 +128,14 @@ pub mod authn {
         }
     }
     #[derive(Debug)]
-    pub struct KeyPair(ed::Keypair);
-    impl KeyPair {
+    pub struct MyKeyPair(SigningKey);
+    impl MyKeyPair {
         pub fn generate() -> Self {
-            Self(Keypair::generate(&mut OsRng {}))
+            let mut csprng = UnwrapErr(SysRng);
+            Self(SigningKey::generate(&mut csprng))
         }
-        pub fn _pubkey(&self) -> PublicKey {
-            self.0.public
+        pub fn _pubkey(&self) -> VerifyingKey {
+            self.0.verifying_key()
         }
         pub fn sign(&self, message: &[u8]) -> Signature {
             self.0.sign(message)
@@ -137,17 +143,22 @@ pub mod authn {
         pub fn verify(&self, message: &[u8], signature: &Signature) -> Result<(), SignatureError> {
             self.0.verify(message, signature)
         }
-        pub fn from_bytes<'a>(bytes: &'a [u8]) -> Result<Self, SignatureError> {
-            Ok(Self(Keypair::from_bytes(bytes)?))
+        pub fn from_bytes<'a>(bytes: &'a [u8; SECRET_KEY_LENGTH]) -> Result<Self, SignatureError> {
+            Ok(Self(SigningKey::from_bytes(bytes)))
         }
-        pub fn to_bytes(&self) -> [u8; 64] {
+        pub fn to_bytes(&self) -> [u8; SECRET_KEY_LENGTH] {
             self.0.to_bytes()
         }
         pub fn from_str(s: &str) -> Result<Self, AnyErr> {
-            Ok(Self::from_bytes(&base64::decode(s)?.to_vec())?)
+            let v: Vec<u8> = general_purpose::STANDARD.decode(s)?;
+            let val: Result<[u8; SECRET_KEY_LENGTH], _> = v.try_into();
+            match val {
+                Ok(u) => Ok(Self::from_bytes(&u)?),
+                Err(_) => Err(anyhow::anyhow!("decode failed")),
+            }
         }
         pub fn to_str(&self) -> String {
-            base64::encode(self.to_bytes().to_vec())
+            general_purpose::STANDARD.encode(self.to_bytes().to_vec())
         }
         fn to_file(&self, keyfile: &str) -> Result<&Self, AnyErr> {
             fs::create_dir_all(KEYS_FOLDER)?;

@@ -5,26 +5,26 @@ authors = ["Nicolas Marshall <marshall.nicolas@gmail.com>"]
 edition = "2018"
 
 [dependencies]
-tokio = { version = "0.2", features = ["macros"] }
-warp = { version = "0.2.2" }
-serde = "1.0.106"
-serde_derive = "1.0.106"
-serde_json = { version = "=1.0.51" }
+tokio = { version = "1", features = ["full"] }
+warp = { version = "0.4", features = ["server", "test"] }
+serde = "1.0"
+serde_derive = "1.0"
+serde_json = { version = "1.0" }
 
 # db, models
-diesel = { version = "1.4.2", features = ["postgres", "uuidv07", "r2d2", "chrono"] }
-r2d2 = "0.8.5"
-postgres = "0.15.1"
-chrono = { version = "0.4.6", features = ["serde"] }
+rusqlite = { version = "0.38.0", features = ["bundled", "chrono"] }
+r2d2 = "0.8"
+r2d2_sqlite = "0.32.0"
+chrono = { version = "0.4", features = ["serde"] }
 # uuid = { version = "0.7", features = ["serde", "v4"] }
 
 # config, errors, logs
-lazy_static = "1.3.0"
-anyhow = "1.0.27"
-thiserror = "1.0.14"
-config = "0.10.1"
-log = "0.4.1"
-pretty_env_logger = "0.3"
+lazy_static = "1.5.0"
+anyhow = "1.0"
+thiserror = "2.0"
+config = "0.15"
+log = "0.4"
+pretty_env_logger = "0.5"
 # dotenv = "0.14.1"
 
 
@@ -32,24 +32,20 @@ pretty_env_logger = "0.3"
 # futures-util-preview = { version = "=0.3.0-alpha.18" }
 # regex = "1.0"
 
-# diesel = { version = "1.4.2", features = ["postgres", "uuidv07", "r2d2", "chrono"] }
-# r2d2 = "0.8.5"
-# postgres = "0.15.1"
-
-
 # crypto, auth
-ed25519-dalek = { version = "1.0.0-pre.3", features = ["nightly"] }
+ed25519-dalek = { version = "3.0.0-pre.5", features = ["digest", "fast", "rand_core"]}
 # secp256k1 = {version = "0.16.0", features = ["rand","serde"]}
-argonautica = "0.2.0"
-rust-crypto = "^0.2"
-bytes = "0.4.12"
-rand = "0.7.3" # same as in ed25519_dalek 1.0.0-pre.3
-base64 = "0.12.0"
+argonautica = "0.2"
+rust-crypto = "0.2"
+bytes = "1.11"
+# rand = "0.10.0-rc.3" # same as in ed25519_dalek 1.0.0-pre.3
+rand = { git = "https://github.com/rust-random/rand", features = ["sys_rng"] }
+base64 = "0.22"
 # jsonwebtoken = "6.0.1"
 # headers=  "0.2.3"
 
 # musl
-openssl = "0.10.26"
+openssl = "0.10"
 
 
 # testing

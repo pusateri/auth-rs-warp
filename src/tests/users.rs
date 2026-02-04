@@ -1,10 +1,8 @@
 pub mod helpers {
-    use rand::distributions::Alphanumeric;
-    use rand::{rngs::StdRng, Rng, SeedableRng};
+    use rand::distr::{Alphanumeric, SampleString};
 
     pub async fn registerUser() -> Result<crate::models::UserResp, anyhow::Error> {
-        let rng = StdRng::seed_from_u64(124356);
-        let rand_string: String = rng.sample_iter(&Alphanumeric).take(12).collect();
+        let rand_string = Alphanumeric.sample_string(&mut rand::rng(), 12);
 
         let res = warp::test::request()
             .method("POST")
@@ -22,11 +20,10 @@ pub mod helpers {
 }
 
 pub mod login {
-    use super::*;
     // Happy path
     #[tokio::test]
     async fn test__users_login__OK() -> Result<(), anyhow::Error> {
-        let user = helpers::registerUser().await?.user;
+        let user = crate::tests::users::helpers::registerUser().await?.user;
         let res = warp::test::request()
             .method("POST")
             .path("/users/login")

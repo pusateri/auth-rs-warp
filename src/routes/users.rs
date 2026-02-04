@@ -1,4 +1,4 @@
-use diesel::prelude::*;
+use rusqlite::Result;
 use serde_json::json;
 use warp::http::Response;
 use warp::{Rejection, Reply};
@@ -36,20 +36,33 @@ pub struct UserAuthIn {
 pub async fn user_login(authIn: UserAuthIn) -> Result<impl Reply, Rejection> {
     let db = db_conn::get().map_err(ServiceError::from)?;
 
-    use crate::schema::users::dsl::{email, users};
-    let mut foundUsers = users
-        .filter(email.eq(&authIn.email))
-        .load::<User>(&db)
-        .map_err(ServiceError::from)?;
+    let mut stmt = db
+        .prepare("SELECT id, created_at, email, hash_pass FROM user where email = :email")
+        .or(Err(ServiceError::Unauthorized))?;
+    let mut user_iter = stmt
+        .query_map(&[(":email", &authIn.email)], |row| {
+            Ok(User {
+                id: row.get(0)?,
+                created_at: row.get(1)?,
+                email: row.get(2)?,
+                hash_pass: row.get(3)?,
+            })
+        })
+        .or(Err(ServiceError::Unauthorized))?;
 
-    let user: User = foundUsers.pop().ok_or(ServiceError::Unauthorized)?;
-    pwhash::verify(&user.hash_pass, &authIn.password).or(Err(ServiceError::Unauthorized))?;
+    if let Some(result) = user_iter.next() {
+        if let Ok(user) = result {
+            pwhash::verify(&user.hash_pass, &authIn.password)
+                .or(Err(ServiceError::Unauthorized))?;
 
-    // set signed cookie with userID
-    let token = AuthnToken::from_userId(user.id)?;
-    Ok(Response::builder()
-        .header("Set-Cookie", token.header_val())
-        .body(json!(UserResp::from(user)).to_string()))
+            // set signed cookie with userID
+            let token = AuthnToken::from_userId(user.id)?;
+            return Ok(Response::builder()
+                .header("Set-Cookie", token.header_val())
+                .body(json!(UserResp::from(user)).to_string()));
+        }
+    }
+    Err(ServiceError::Unauthorized)?
 }
 
 #[derive(Debug, Deserialize)]
@@ -60,13 +73,24 @@ pub struct UserCheckIn {
 pub async fn user_check(checkIn: UserCheckIn) -> Result<impl Reply, Rejection> {
     let db = db_conn::get().map_err(ServiceError::from)?;
 
-    use crate::schema::users::dsl::{email, users};
-    let mut foundUsers = users
-        .filter(email.eq(&checkIn.email))
-        .load::<User>(&db)
-        .map_err(ServiceError::from)?;
+    let mut stmt = db
+        .prepare("SELECT id, created_at, email, hash_pass FROM user  where email = :email")
+        .or(Err(ServiceError::Unauthorized))?;
+    let mut user_iter = stmt
+        .query_map(&[(":email", &checkIn.email)], |row| {
+            Ok(User {
+                id: row.get(0)?,
+                created_at: row.get(1)?,
+                email: row.get(2)?,
+                hash_pass: row.get(3)?,
+            })
+        })
+        .or(Err(ServiceError::Unauthorized))?;
 
-    let user: User = foundUsers.pop().ok_or(ServiceError::NotFound("user"))?;
-
-    Ok(Response::builder().body(json!(UserResp::from(user)).to_string()))
+    if let Some(result) = user_iter.next() {
+        if let Ok(user) = result {
+            return Ok(Response::builder().body(json!(UserResp::from(user)).to_string()));
+        }
+    }
+    Err(ServiceError::Unauthorized)?
 }

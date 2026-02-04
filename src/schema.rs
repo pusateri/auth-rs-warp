@@ -1,8 +1,9 @@
-table! {
-    users (id) {
-        id -> Int8,
-        created_at -> Timestamp,
-        email -> Varchar,
-        hash_pass -> Varchar,
-    }
+use chrono::{DateTime, Utc};
+
+#[derive(Debug)]
+pub struct Users {
+    pub id: i64,
+    pub created_at: DateTime<Utc>,
+    pub email: String,
+    pub hash_pass: String,
 }
