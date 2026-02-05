@@ -55,7 +55,7 @@ impl ErrMsg {
             message: msg.into(),
         }
     }
-    pub fn into_reply(&self) -> impl warp::Reply {
+    pub fn into_reply(&self) -> impl warp::Reply + use<> {
         warp::reply::with_status(warp::reply::json(&self), self.statuscode)
     }
 }
