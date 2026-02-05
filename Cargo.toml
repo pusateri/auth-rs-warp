@@ -16,7 +16,6 @@ rusqlite = { version = "0.38.0", features = ["bundled", "chrono"] }
 r2d2 = "0.8"
 r2d2_sqlite = "0.32.0"
 chrono = { version = "0.4", features = ["serde"] }
-# uuid = { version = "0.7", features = ["serde", "v4"] }
 
 # config, errors, logs
 lazy_static = "1.5.0"
@@ -25,28 +24,14 @@ thiserror = "2.0"
 config = "0.15"
 log = "0.4"
 pretty_env_logger = "0.5"
-# dotenv = "0.14.1"
-
-
-# hyper = "=0.13.0-alpha.1"
-# futures-util-preview = { version = "=0.3.0-alpha.18" }
-# regex = "1.0"
 
 # crypto, auth
 ed25519-dalek = { version = "3.0.0-pre.5", features = ["digest", "fast", "rand_core"]}
-# secp256k1 = {version = "0.16.0", features = ["rand","serde"]}
 argonautica = "0.2"
 rust-crypto = "0.2"
 bytes = "1.11"
-# rand = "0.10.0-rc.3" # same as in ed25519_dalek 1.0.0-pre.3
 rand = { git = "https://github.com/rust-random/rand", features = ["sys_rng"] }
 base64 = "0.22"
-# jsonwebtoken = "6.0.1"
-# headers=  "0.2.3"
 
 # musl
 openssl = "0.10"
-
-
-# testing
-[dev-dependencies]
