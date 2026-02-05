@@ -34,8 +34,6 @@ These options are:
 | ----------------- | :------------------ | :------------------ | -------------------- |
 | Sqlite filename   | `DATABASE_URL`      | `database_url`      | file.db              |
 | HTTP port         | `HTTP_PORT`         | `http_port`         | `8080`               |
-| Log level         | `RUST_LOG`          | `postgres_db`       | `auth-rs-warp=debug` |
-| Enable backtraces | `RUST_BACKTRACE`    | `rust_backtrace`    | `1`                  |
 
 ## Testing
 
@@ -64,5 +62,4 @@ If you want to help here's a few useful tasks I have in mind for this project:
 
 - [ ] Email verification and email invitations
 - [ ] CI
-- [ ] example deployment instructions
 - [ ] Write a tutorial to re-create this repo from scratch
